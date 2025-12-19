@@ -352,4 +352,13 @@ If this work is helpful for your research, please consider citing the following 
   journal={arXiv preprint arXiv:2504.20690},
   year={2025}
 }
+
+@inproceedings{zhang2025icedit,
+  title     = {In-Context Edit: Enabling Instructional Image Editing with In-Context Generation in Large-Scale Diffusion Transformers},
+  author    = {Zhang, Zechuan and Xie, Ji and Lu, Yu and Yang, Zongxin and Yang, Yi},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2025},
+  note      = {arXiv:2504.20690}
+}
+
 ```
