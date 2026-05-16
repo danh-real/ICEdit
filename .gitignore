@@ -10,3 +10,4 @@ success.txt
 *.ipynb
 *.csv
 ckpt/
+train/run/

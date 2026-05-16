@@ -46,7 +46,8 @@ def init_wandb(wandb_config, run_name):
     import wandb
 
     try:
-        assert os.environ.get("WANDB_API_KEY") is not None
+        # print(os.environ.get("WANDB_API_KEY"))
+        # assert os.environ.get("WANDB_API_KEY") is not None
         wandb.init(
             project=wandb_config["project"],
             name=run_name,
