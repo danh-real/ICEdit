@@ -21,7 +21,7 @@ train:
   condition_type: "edit"
   dataset:
     type: "any_edit"
-    path: "/data/datasets"
+    path: "/data/sd/datasets"
     condition_size: 512
     target_size: 512
     image_size: 512
