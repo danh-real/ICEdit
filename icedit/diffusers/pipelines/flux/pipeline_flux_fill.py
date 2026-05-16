@@ -638,6 +638,7 @@ class FluxFillPipeline(
     ):
         # VAE applies 8x compression on images but we must also account for packing which requires
         # latent height and width to be divisible by 2.
+        
         height = 2 * (int(height) // (self.vae_scale_factor * 2))
         width = 2 * (int(width) // (self.vae_scale_factor * 2))
 
@@ -903,6 +904,7 @@ class FluxFillPipeline(
         else:
             guidance = None
 
+        ablation_data = []
         # 7. Denoising loop
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -923,6 +925,39 @@ class FluxFillPipeline(
                     joint_attention_kwargs=self.joint_attention_kwargs,
                     return_dict=False,
                 )[0]
+                
+                # Collect (layer_name, route_weight_tensor) for all layers in order
+                _layer_info = []
+                for idx, blk in enumerate(self.transformer.transformer_blocks):
+                    _layer_info.append((f"transformer_blocks.{idx}", blk.ff.net[2].route_weight))
+                for idx, blk in enumerate(self.transformer.single_transformer_blocks):
+                    _layer_info.append((f"single_transformer_blocks.{idx}", blk.proj_out.route_weight))
+
+                # dominant expert per token at each layer: list of [num_tokens] tensors
+                _n_experts = _layer_info[0][1].shape[-1]
+                _dominant = [rw.argmax(dim=-1).squeeze(0).long() for _, rw in _layer_info]
+
+                for layer_idx, (layer_name, rw) in enumerate(_layer_info):
+                    route_weight = rw.sum(dim=(0, 1)).tolist()
+                    if layer_idx == 0:
+                        route_path = [[0] * _n_experts for _ in range(_n_experts)]
+                    else:
+                        prev = _dominant[layer_idx - 1] # [B,L,N_expert]
+                        curr = _dominant[layer_idx] # [B,L,N_expert]
+
+                        # At the TB→STB boundary, TB has image tokens only (2048)
+                        # while STB has [text(512), image(2048)] concatenated (2560).
+                        # Align by taking the trailing image-token portion of the
+                        # longer tensor so both sides represent the same tokens.
+                        if prev.shape[0] != curr.shape[0]:
+                            min_len = min(prev.shape[0], curr.shape[0])
+                            prev = prev[-min_len:]
+                            curr = curr[-min_len:]
+                        flat_idx = (prev * _n_experts + curr).long() 
+                        counts = torch.bincount(flat_idx, minlength=_n_experts * _n_experts)
+                        route_path = counts.reshape(_n_experts, _n_experts).tolist()
+
+                    ablation_data.append((i, layer_name, route_weight, route_path))
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latents_dtype = latents.dtype
@@ -963,6 +998,6 @@ class FluxFillPipeline(
         self.maybe_free_model_hooks()
 
         if not return_dict:
-            return (image,)
+            return (image,ablation_data)
 
-        return FluxPipelineOutput(images=image)
+        return FluxPipelineOutput(images=image, ablation_data=ablation_data)

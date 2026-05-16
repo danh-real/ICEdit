@@ -19,7 +19,8 @@ from datasets import load_dataset
 from .data import (
     EditDataset,
     OminiDataset,
-    EditDataset_with_Omini
+    EditDataset_with_Omini,
+    EditDataset_AnyEdit
 )
 from .model import OminiModel
 from .callbacks import TrainingCallback
@@ -109,6 +110,14 @@ def main():
             condition_size=training_config["dataset"]["condition_size"],
             target_size=training_config["dataset"]["target_size"],
             drop_text_prob=training_config["dataset"]["drop_text_prob"],
+        )
+    elif training_config["dataset"]["type"] == "any_edit":
+        dataset = EditDataset_AnyEdit(
+            path=training_config["dataset"]["path"],
+            condition_size=training_config["dataset"]["condition_size"],
+            target_size=training_config["dataset"]["target_size"],
+            drop_text_prob=training_config["dataset"]["drop_text_prob"],
+            specific_task=training_config["dataset"]["specific_task"]
         )
           
 

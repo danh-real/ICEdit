@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import numpy as np
 import PIL.Image
@@ -20,6 +20,7 @@ class FluxPipelineOutput(BaseOutput):
     """
 
     images: Union[List[PIL.Image.Image], np.ndarray]
+    ablation_data: List[Tuple]
 
 
 @dataclass

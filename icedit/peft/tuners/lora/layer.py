@@ -445,7 +445,7 @@ class Linear(nn.Module, LoraLayer):
         self.top_k = kwargs.get("top_k", 4)
         self.blc_alpha = kwargs.get("blc_alpha", 0.0)
         self.blc_weight = kwargs.get("blc_weight", 0.0)
-        
+
         if "ff.net" in kwargs["current_key"] or "proj_out" in kwargs["current_key"]:
             self.moe_lora = True
             self.update_moe_layer(
@@ -558,7 +558,7 @@ class Linear(nn.Module, LoraLayer):
         else:
             self.use_dora[adapter_name] = False
 
-        
+
         self.set_adapter(self.active_adapters+expert_list)
 
 
@@ -710,7 +710,7 @@ class Linear(nn.Module, LoraLayer):
 
         if self.moe_lora:
             return self.moe_forward(x, *args, **kwargs)
-        
+
         self._check_forward_args(x, *args, **kwargs)
         adapter_names = kwargs.pop("adapter_names", None)
 
@@ -775,23 +775,23 @@ class Linear(nn.Module, LoraLayer):
                 result = self.base_layer(x, *args, **kwargs)
                 torch_result_dtype = result.dtype
                 activate_adapter_name = self.active_adapters[0]
-                
+
                 # 计算路由分数
                 route_logits = self.lora_route[activate_adapter_name](x)
-                
+
                 # 获取 top-k，保持梯度流
                 top_k_probs, top_k_indices = torch.topk(route_logits, k=self.top_k, dim=-1)
 
                 top_k_probs = F.softmax(top_k_probs, dim=-1, dtype=torch.float32).to(result.dtype)
-                
+                # print(top_k_probs.shape)
                 # 创建掩码并应用
                 route_weight = torch.zeros_like(route_logits)
-                route_weight=route_weight.scatter_(-1, top_k_indices, top_k_probs)
-                # 计算 softmax，topk之外的weight应该是0 
+                route_weight=route_weight.scatter_(-1, top_k_indices, top_k_probs) # [1,2048+512,4]
+                # 计算 softmax，topk之外的weight应该是0
 
-                #print(route_weight.shape)
-                #print(route_weight)
-                
+                self.route_weight = route_weight.detach().clone()
+                # print(route_weight.shape) # NOTE: logging
+
                 # 应用专家
                 for i in range(self.num_experts):
                     expert_name = f"expert_{i}"
@@ -807,7 +807,7 @@ class Linear(nn.Module, LoraLayer):
                 result = self.base_layer(x, *args, **kwargs)
                 torch_result_dtype = result.dtype
                 activate_adapter_name = self.active_adapters[0]
-                route_logits = self.lora_route[activate_adapter_name](x[:,0]) 
+                route_logits = self.lora_route[activate_adapter_name](x[:,0])
                 # 将route_logits扩展到与x相同的形状
                 route_logits=route_logits.unsqueeze(1).repeat(1,x.shape[1],1)
 
@@ -815,13 +815,13 @@ class Linear(nn.Module, LoraLayer):
                 top_k_probs, top_k_indices = torch.topk(route_logits, k=self.top_k, dim=-1)
 
                 top_k_probs = F.softmax(top_k_probs, dim=-1, dtype=torch.float32).to(result.dtype)
-                
+
                 # 创建掩码并应用，mask应该初始值是负无穷-inf
                 route_weight = torch.zeros_like(route_logits)
                 route_weight=route_weight.scatter_(-1, top_k_indices, top_k_probs)
-             
-                # 计算 softmax，topk之外的weight应该是0 
-                
+
+                # 计算 softmax，topk之外的weight应该是0
+
                 # 应用专家
                 for i in range(self.num_experts):
                     expert_name = f"expert_{i}"
@@ -832,7 +832,7 @@ class Linear(nn.Module, LoraLayer):
                     result += lora_B(lora_A(dropout(x))) * scaling * torch.unsqueeze(route_weight[:,:,i], -1)
 
                 result = result.to(torch_result_dtype)
-                    
+
         return result
 
     def __repr__(self) -> str:

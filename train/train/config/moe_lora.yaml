@@ -14,20 +14,20 @@ train:
   save_interval: 1000
   sample_interval: 1000
   max_steps: -1
-  gradient_checkpointing: false
+  gradient_checkpointing: true
   save_path: "runs"
 
   condition_type: "edit"
   dataset:
-    type: "edit_with_omini"
-    path: "../MagicBrush"
+    type: "any_edit"
+    path: "/data/datasets"
     condition_size: 512
     target_size: 512
     image_size: 512
     padding: 8
     drop_text_prob: 0.1
     drop_image_prob: 0.1
-    # specific_task: ["removal", "style", "attribute_modification", "env", "swap"]
+    specific_task: ["remove"]
 
   wandb:
     project: "OminiControl"

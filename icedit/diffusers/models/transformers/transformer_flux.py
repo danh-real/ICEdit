@@ -170,6 +170,8 @@ class FluxTransformerBlock(nn.Module):
         image_rotary_emb=None,
         joint_attention_kwargs=None,
     ):
+        # NOTE: logging
+        # print(f"\033[92m hidden_states {hidden_states.shape}, encoder_hidden_states {encoder_hidden_states.shape}, temb {temb.shape} \033[0m")
         norm_hidden_states, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.norm1(hidden_states, emb=temb)
 
         norm_encoder_hidden_states, c_gate_msa, c_shift_mlp, c_scale_mlp, c_gate_mlp = self.norm1_context(
@@ -190,6 +192,7 @@ class FluxTransformerBlock(nn.Module):
             attn_output, context_attn_output, ip_attn_output = attention_outputs
 
         # Process attention outputs for the `hidden_states`.
+        # print("msa", attn_output.shape, gate_msa.shape, gate_msa.min(), gate_msa.max())# NOTE: logging
         attn_output = gate_msa.unsqueeze(1) * attn_output
         hidden_states = hidden_states + attn_output
 
@@ -197,6 +200,7 @@ class FluxTransformerBlock(nn.Module):
         norm_hidden_states = norm_hidden_states * (1 + scale_mlp[:, None]) + shift_mlp[:, None]
 
         ff_output = self.ff(norm_hidden_states)   # need to add blance loss for moe
+        # print("mlp", ff_output.shape, gate_mlp.shape, gate_mlp.min(), gate_mlp.max())# NOTE: logging
         ff_output = gate_mlp.unsqueeze(1) * ff_output
 
         hidden_states = hidden_states + ff_output
