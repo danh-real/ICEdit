@@ -28,7 +28,7 @@ train:
     padding: 8
     drop_text_prob: 0.1
     drop_image_prob: 0.1
-    specific_task: ["remove"]
+    specific_task: ["resize"]
 
   wandb:
     project: "OminiControl"
