@@ -64,7 +64,7 @@ def main():
     config = get_config()
     training_config = config["train"]
     run_name = time.strftime("%Y%m%d-%H%M%S")
-    
+
     seed = 666
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -79,12 +79,12 @@ def main():
     print("Rank:", rank)
     if is_main_process:
         print("Config:", config)
-        
+
     if 'use_offset_noise' not in config.keys():
         config['use_offset_noise'] = False
 
     # Initialize dataset and dataloader
-    
+
     if training_config["dataset"]["type"] == "edit":
         dataset = load_dataset('osunlp/MagicBrush')
         dataset = EditDataset(
@@ -120,7 +120,7 @@ def main():
             drop_text_prob=training_config["dataset"]["drop_text_prob"],
             specific_task=training_config["dataset"]["specific_task"]
         )
-          
+
 
     print("Dataset length:", len(dataset))
     train_loader = DataLoader(

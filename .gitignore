@@ -10,4 +10,5 @@ success.txt
 *.ipynb
 *.csv
 ckpt/
-train/run/
+train/runs/
+wandb/
