@@ -1,4 +1,4 @@
-flux_path: "../ckpt/FLUX.1-Fill-dev"
+flux_path: "/data/sd/ICEdit/ckpt/FLUX.1-Fill-dev"
 dtype: "bfloat16"
 
 model:
