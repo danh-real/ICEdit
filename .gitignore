@@ -9,3 +9,4 @@ success.txt
 *.safetensors
 *.ipynb
 *.csv
+ckpt/
