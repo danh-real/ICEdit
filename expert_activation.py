@@ -1,4 +1,5 @@
 import ast
+import json
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -41,20 +42,9 @@ _PATH_COLS = [f"p{i}{j}" for i in range(4) for j in range(4)]
 # One subplot per edit type, filtered to "resize" and "style_change".
 # Line thickness ∝ normalised fraction of tokens following that connection.
 # ─────────────────────────────────────────────────────────────────────────────
-
-_FLOW_TYPES   = ["resize", "style_change", "remove", "add", "color_alter"]
-_CASE_ID = [
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000478670.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000003623.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000330979.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000066652.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000552093.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000555627.jpg",
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000064186.jpg",
-]
-_SUCCESS_CASE = [    
-    "/data/datasets/AnyEdit/anybench/resize/input_img/COCO_train2014_000000478670.jpg",
-]
+ROOT          = "/data/datasets/AnyEdit/anybench/remove/input_img/"
+_FLOW_TYPES   = ["resize", "remove", "decomposed_resize"]
+_CASE_ID = {ROOT + k : v for k,v in json.load(open('remove-failure-mode.json', "r")).items()}
 _FLOW_COLORS  = ["#4C72B0", "#DD8452", "#55A868", "#C44E52"]  # one per expert
 _N_EXP        = 4
 _EXP_X        = np.array([0.0, 1.0, 2.0, 3.0])   # expert column x-positions
@@ -154,21 +144,21 @@ def _draw_flow_ax(ax, route_data, layers, n_tb, title):
 
 # ── Aggregate route_path per (edit_type, layer) ───────────────────────────────
 # _df_flow = df[df["edit_type"].isin(_FLOW_TYPES)].copy()
-_df_flow = df[df["image_path"].isin(_CASE_ID)].copy()
+_df_flow = df[df["image_path"].isin(list(_CASE_ID.keys()))].copy()
 
 _pf2  = _df_flow["route_path"].apply(lambda s: [v for row in ast.literal_eval(s) for v in row])
 _pdf2 = pd.DataFrame(_pf2.tolist(), index=_df_flow.index, columns=_PATH_COLS)
 _df_flow2 = pd.concat([_df_flow[["image_path", "edit_type", "layer"]], _pdf2], axis=1)
 _df_flow2 = _df_flow2[_df_flow2["layer"] != "transformer_blocks.0"]
-_df_flow2["success"] = _df_flow2["image_path"].isin(_SUCCESS_CASE)
+_df_flow2["failure_mode"] = _df_flow2["image_path"].map(_CASE_ID)
 
 # _agg_flow = _df_flow2.groupby(["edit_type", "layer"])[_PATH_COLS].sum()
-_agg_flow = _df_flow2.groupby(["success", "layer"])[_PATH_COLS].sum()
+_agg_flow = _df_flow2.groupby(["failure_mode", "layer"])[_PATH_COLS].sum()
 
 def _get_route_data(etype):
     """Return dict: layer_name -> (4,4) fraction-normalised numpy array."""
     data = {}
-    if etype not in _agg_flow.index.get_level_values("success"): #NOTE
+    if etype not in _agg_flow.index.get_level_values("failure_mode"): #NOTE
         return data
     sub = _agg_flow.loc[etype]
     for lname, row in sub.iterrows():
@@ -179,17 +169,21 @@ def _get_route_data(etype):
         data[lname] = mat
     return data
 
-AX_COLS = [True, False]
+FAILURE_MODES = list(set(_CASE_ID.values()))
+CASE_COUNTS = {m:0 for m in FAILURE_MODES}
+for v in _CASE_ID.values():
+    CASE_COUNTS[v] += 1
+    
 # ── Build figure ──────────────────────────────────────────────────────────────
 _fig_h  = max(20, N_LAYERS * _STEP * 0.38)
 fig6, axes6 = plt.subplots(
-    1, len(AX_COLS),
-    figsize=(len(AX_COLS) * 5.5, _fig_h),
+    1, len(FAILURE_MODES),
+    figsize=(len(FAILURE_MODES) * 5.5, _fig_h),
     constrained_layout=True,
 )
 
-for ax_i, etype in enumerate(AX_COLS):
-    _draw_flow_ax(axes6[ax_i], _get_route_data(etype), ALL_LAYERS, N_TB, title=f"success={etype}")
+for ax_i, etype in enumerate(FAILURE_MODES):
+    _draw_flow_ax(axes6[ax_i], _get_route_data(etype), ALL_LAYERS, N_TB, title=f"{etype}")# ({CASE_COUNTS[etype]} case)")
 
 _leg = [mpatches.Patch(color=_FLOW_COLORS[e], label=f"from Expert {e}")
         for e in range(_N_EXP)]
@@ -200,6 +194,6 @@ fig6.suptitle(
     "(line width ∝ fraction of tokens following that connection)",
     fontsize=12,
 )
-fig6.savefig("route_path_flow_resize.png", dpi=150, bbox_inches="tight")
-print("Saved route_path_flow_resize.png")
+fig6.savefig("route_path_flow_remove.png", dpi=150, bbox_inches="tight")
+print("Saved route_path_flow_remove.png")
 plt.show()

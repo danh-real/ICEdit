@@ -12,3 +12,4 @@ success.txt
 ckpt/
 train/runs/
 wandb/
+*.json

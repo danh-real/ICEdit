@@ -39,12 +39,19 @@ else:
 
 with open(args.edit_file, "r") as f:
     edits = json.load(f)
+    
+# with open("decomposed_instruction_2pass.json", "r") as f:
+#     resize2remove = json.load(f)
 
 ablation_data = []
 for index, edit in enumerate(tqdm(edits)):
+    
+    # if edit["edit_type"] != "resize":
+    #     continue
 
     image_path = os.path.join(args.data_root, edit["input_image"])
     instruction = edit["instruction"]
+    # instruction = resize2remove[instruction]
     task = edit["edit_type"] if "edit_type" in edit.keys() else ""
     save_dir = os.path.join(args.output_dir, task, "ICEdit", str(edit["id"]))
     
@@ -84,14 +91,14 @@ for index, edit in enumerate(tqdm(edits)):
         generator=torch.Generator("cpu").manual_seed(args.seed) if args.seed is not None else None,
     )
     
-    # result_image = pipe_output.images[0]
-    # result_image = result_image.crop((width,0,width*2,height))
+    result_image = pipe_output.images[0]
+    result_image = result_image.crop((width,0,width*2,height))
 
-    # result_image.save(os.path.join(save_dir, f"output.jpg"))
-    # print(f"\033[92mResult saved as {os.path.join(save_dir, 'output.jpg')}\033[0m")
+    result_image.save(os.path.join(save_dir, f"output.jpg"))
+    print(f"\033[92mResult saved as {os.path.join(save_dir, 'output.jpg')}\033[0m")
 
-    # with open(os.path.join(save_dir, "instruction.txt"), "w") as f:
-    #     print(instruction, file=f)
+    with open(os.path.join(save_dir, "instruction.txt"), "w") as f:
+        print(instruction, file=f)
         
     # NOTE: ABLATION STUDY
     ablation_data.extend([(image_path, task, *data) for data in pipe_output.ablation_data])
@@ -100,4 +107,4 @@ df = pd.DataFrame(
     ablation_data,
     columns=["image_path", "edit_type", "timestep", "layer", "route_weight", "route_path"],
 )
-df.to_csv("/data/code/models/ICEdit/ablation_AnyEdit.csv")
+df.to_csv("/data/repos/models/ICEdit/ablation_AnyEdit_exp.csv")

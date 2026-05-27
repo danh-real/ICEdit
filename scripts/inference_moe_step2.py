@@ -49,10 +49,8 @@ if image.size[0] != 512:
 
 instruction = args.instruction
 
-print(f"Instruction: {instruction}")
-# instruction = f'A diptych with three side-by-side images of the same scene. On the right, the scene is exactly the same as on the left but {instruction}'
-
 instruction = f'A diptych with three side-by-side images of the same scene. On the right, the scene is exactly the same as on the middle but {instruction}'
+print(f"Instruction: {instruction}")
 
 width, height = image.size
 combined_image = Image.new("RGB", (width * 3, height))
@@ -62,6 +60,8 @@ combined_image.paste(first_turn_image, (width * 2, 0))
 mask_array = np.zeros((height, width * 3), dtype=np.uint8)
 mask_array[:, width*2:] = 255
 mask = Image.fromarray(mask_array)
+
+combined_image.save("step2_combined_image.jpg")
 
 pipe_output = pipe(
     prompt=instruction,

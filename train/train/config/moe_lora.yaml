@@ -10,7 +10,7 @@ model:
 
 train:
   batch_size: 1
-  accumulate_grad_batches: 2
+  accumulate_grad_batches: 8
   dataloader_workers: 2
   save_interval: 1000
   sample_interval: 1000
@@ -29,7 +29,7 @@ train:
     padding: 8
     drop_text_prob: 0.1
     drop_image_prob: 0.1
-    specific_task: ["resize"]
+    specific_task: ["remove"]
 
   wandb:
     project: "ICEdit"

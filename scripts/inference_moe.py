@@ -48,8 +48,8 @@ if image.size[0] != 512:
 
 instruction = args.instruction
 
-print(f"Instruction: {instruction}")
 instruction = f'A diptych with three side-by-side images of the same scene. On the right, the scene is exactly the same as on the left but {instruction}'
+print(f"Instruction: {instruction}")
 
 width, height = image.size
 combined_image = Image.new("RGB", (width * 2, height))
@@ -77,5 +77,5 @@ result_image = result_image.crop((width,0,width*2,height))
 os.makedirs(args.output_dir, exist_ok=True)
 
 image_name = args.image.split("/")[-1]
-result_image.save(os.path.join(args.output_dir, f"{image_name}_remove.jpg"))
+result_image.save(os.path.join(args.output_dir, f"{image_name}_resizeDecompose.jpg"))
 print(f"\033[92mResult saved as {os.path.abspath(os.path.join(args.output_dir, image_name))}\033[0m")

@@ -23,7 +23,7 @@ from .data import (
     EditDataset_AnyEdit
 )
 from .model import OminiModel
-from .callbacks import TrainingCallback
+from .callbacks import TrainingCallback, TimingCallback
 
 
 def get_rank():
@@ -146,7 +146,7 @@ def main():
     training_callbacks = (
         [TrainingCallback(run_name, training_config=training_config)]
         if is_main_process
-        else []
+        else [TimingCallback(print_every_n_steps=10)]
     )
 
     # Initialize trainer

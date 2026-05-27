@@ -13,7 +13,7 @@
 #     --edit_file /data/datasets/emu_edit_test_set/edit.json \
 #     --data_root /data/datasets/emu_edit_test_set
 
-CUDA_VISIBLE_DEVICES=0 python scripts/benchmark_moe.py \
-    --output-dir /data/code/models/0-output/AnyEdit \
-    --edit_file /data/datasets/AnyEdit/edit.json \
+CUDA_VISIBLE_DEVICES=1 python scripts/benchmark_moe.py \
+    --output-dir /data/repos/models/0-output/AnyEdit-Exp \
+    --edit_file /data/repos/models/ICEdit/exp.json \
     --data_root /data/datasets/AnyEdit
