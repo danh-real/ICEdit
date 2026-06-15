@@ -20,10 +20,10 @@ parser.add_argument("--image", type=str, help="Name of the image to be edited", 
 parser.add_argument("--instruction", type=str, help="Instruction for editing the image", required=True)
 parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
 parser.add_argument("--output-dir", type=str, default=".", help="Directory to save the output image")
-parser.add_argument("--output-suffix", type=str, help="Edit saved file suffix")
 parser.add_argument("--flux-path", type=str, default='black-forest-labs/flux.1-fill-dev', help="Path to the model")
 parser.add_argument("--lora-path", type=str, default='sanaka87/ICEdit-MoE-LoRA', help="Path to the LoRA weights")
 parser.add_argument("--enable-model-cpu-offload", action="store_true", help="Enable CPU offloading for the model")
+
 
 args = parser.parse_args()
 pipe = FluxFillPipeline.from_pretrained(args.flux_path, torch_dtype=torch.bfloat16)
@@ -77,5 +77,5 @@ result_image = result_image.crop((width,0,width*2,height))
 os.makedirs(args.output_dir, exist_ok=True)
 
 image_name = args.image.split("/")[-1]
-result_image.save(os.path.join(args.output_dir, f"{image_name}_{args.output_suffix}.jpg"))
+result_image.save(os.path.join(args.output_dir, f"{image_name}_remove.jpg"))
 print(f"\033[92mResult saved as {os.path.abspath(os.path.join(args.output_dir, image_name))}\033[0m")

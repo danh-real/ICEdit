@@ -13,3 +13,6 @@ ckpt/
 train/runs/
 wandb/
 *.json
+*.pdf
+ablation/
+*.log

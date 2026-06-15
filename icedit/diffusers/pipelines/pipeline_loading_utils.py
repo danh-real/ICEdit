@@ -694,7 +694,9 @@ def load_sub_model(
         loading_kwargs["device_map"] = device_map
         loading_kwargs["max_memory"] = max_memory
         loading_kwargs["offload_folder"] = offload_folder
-        loading_kwargs["offload_state_dict"] = offload_state_dict
+        # offload_state_dict was removed from transformers.from_pretrained in 4.57.0
+        if is_diffusers_model or transformers_version < version.parse("4.57.0"):
+            loading_kwargs["offload_state_dict"] = offload_state_dict
         loading_kwargs["variant"] = model_variants.pop(name, None)
         loading_kwargs["use_safetensors"] = use_safetensors
 

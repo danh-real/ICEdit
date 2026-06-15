@@ -42,11 +42,11 @@ class TimingCallback(L.Callback):
                 if hasattr(self, "_data_load_time")
                 else "N/A"
             )
-            print(
-                f"[Timing] Step {self._total_steps}: "
-                f"step={self._step_time * 1000:.1f} ms, "
-                f"data_load={data_load_str}"
-            )
+            # print(
+            #     f"[Timing] Step {self._total_steps}: "
+            #     f"step={self._step_time * 1000:.1f} ms, "
+            #     f"data_load={data_load_str}"
+            # )
 
 
 class TrainingCallback(L.Callback):
@@ -60,7 +60,7 @@ class TrainingCallback(L.Callback):
 
         self.wandb_config = training_config.get("wandb", None)
         self.use_wandb = (
-            wandb is not None and os.environ.get("WANDB_API_KEY") is not None
+            wandb is not None
         )
 
         self.total_steps = 0

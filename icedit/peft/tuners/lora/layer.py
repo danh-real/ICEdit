@@ -461,6 +461,11 @@ class Linear(nn.Module, LoraLayer):
                 expert_rank=self.expert_rank,
                 expert_alpha=self.expert_alpha,
             )
+            # RL routing state
+            self.routing_mode = "greedy"   # "greedy" | "stochastic"
+            self.stored_actions: Optional[torch.Tensor] = None   # [B, T, K]
+            self.stored_mask: Optional[torch.Tensor] = None      # [B, T] bool, stochastic positions
+            self.routing_mask: Optional[torch.Tensor] = None     # [B, T_global] global mask from rl_training_step
         else:
             self.moe_lora = False
 
@@ -776,21 +781,45 @@ class Linear(nn.Module, LoraLayer):
                 torch_result_dtype = result.dtype
                 activate_adapter_name = self.active_adapters[0]
 
-                # 计算路由分数
-                route_logits = self.lora_route[activate_adapter_name](x)
+                route_logits = self.lora_route[activate_adapter_name](x)  # [B, T, E]
 
-                # 获取 top-k，保持梯度流
-                top_k_probs, top_k_indices = torch.topk(route_logits, k=self.top_k, dim=-1)
+                if self.routing_mode == "stochastic":
+                    # Uniform random expert selection: top-k of U[0,1) scores, fully
+                    # decoupled from the router logits.  The policy-gradient loss still
+                    # computes log P_policy(action | state) from lora_route, so the
+                    # router learns which expert subsets yield better rewards.
+                    #
+                    # routing_mask is a global [B, T_global] bool tensor set once per
+                    # rollout in rl_training_step.  Each layer slices it to its own T,
+                    # so layers processing fewer tokens (text-only, combined streams)
+                    # may naturally receive fewer — or zero — stochastic positions.
+                    random_scores = torch.rand_like(route_logits)
+                    if self.routing_mask is not None:
+                        # routing_mask is pre-split to this layer's [B, T] by
+                        # generate_global_routing_masks — no slicing needed.
+                        stoch_mask = self.routing_mask.to(x.device)
+                        _, greedy_indices = torch.topk(route_logits, k=self.top_k, dim=-1)
+                        _, random_indices = torch.topk(random_scores, k=self.top_k, dim=-1)
+                        mask_k = stoch_mask.unsqueeze(-1).expand_as(greedy_indices)
+                        top_k_indices = torch.where(mask_k, random_indices, greedy_indices)
+                        self.stored_mask = stoch_mask.detach().cpu()
+                    else:
+                        # No global mask: all tokens are stochastic
+                        _, top_k_indices = torch.topk(random_scores, k=self.top_k, dim=-1)
+                        self.stored_mask = None
+                    self.stored_actions = top_k_indices.detach()
+                    self.stored_logits = route_logits
+                    top_k_probs = F.softmax(
+                        route_logits.gather(-1, top_k_indices), dim=-1, dtype=torch.float32
+                    ).to(result.dtype)
 
-                top_k_probs = F.softmax(top_k_probs, dim=-1, dtype=torch.float32).to(result.dtype)
-                # print(top_k_probs.shape)
-                # 创建掩码并应用
+                else:  # "greedy" — original behaviour (default)
+                    top_k_probs, top_k_indices = torch.topk(route_logits, k=self.top_k, dim=-1)
+                    top_k_probs = F.softmax(top_k_probs, dim=-1, dtype=torch.float32).to(result.dtype)
+
                 route_weight = torch.zeros_like(route_logits)
-                route_weight=route_weight.scatter_(-1, top_k_indices, top_k_probs) # [1,2048+512,4]
-                # 计算 softmax，topk之外的weight应该是0
-
+                route_weight = route_weight.scatter_(-1, top_k_indices, top_k_probs)  # [B, T, E]
                 self.route_weight = route_weight.detach().clone()
-                # print(route_weight.shape) # NOTE: logging
 
                 # 应用专家
                 for i in range(self.num_experts):

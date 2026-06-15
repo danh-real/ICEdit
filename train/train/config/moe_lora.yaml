@@ -1,5 +1,5 @@
-flux_path: "/data/sd/ICEdit/ckpt/FLUX.1-Fill-dev"
-# flux_path: "/data/repos/models/ICEdit/ckpt/FLUX.1-Fill-dev"
+# flux_path: "/data/sd/ICEdit/ckpt/FLUX.1-Fill-dev"
+flux_path: "/data/repos/models/ICEdit/ckpt/FLUX.1-Fill-dev"
 dtype: "bfloat16"
 
 model:
@@ -10,26 +10,27 @@ model:
 
 train:
   batch_size: 1
-  accumulate_grad_batches: 8
+  accumulate_grad_batches: 4
   dataloader_workers: 2
   save_interval: 1000
   sample_interval: 1000
-  max_steps: -1
+  max_steps: 100000
   gradient_checkpointing: true
-  save_path: "runs"
+  save_path: "runs/train_add_only"
 
   condition_type: "edit"
   dataset:
     type: "any_edit"
-    path: "/data/sd/datasets"
-    # path: "/data/datasets"
+    # path: "/data/sd/datasets"
+    path: "/data/datasets"
+    # path: "TIGER-Lab/OmniEdit-Filtered-1.2M"
     condition_size: 512
     target_size: 512
     image_size: 512
     padding: 8
     drop_text_prob: 0.1
     drop_image_prob: 0.1
-    specific_task: ["remove"]
+    specific_task: ["add"]
 
   wandb:
     project: "ICEdit"

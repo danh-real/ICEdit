@@ -89,60 +89,65 @@ class EditDataset_with_Omini(Dataset):
 class OminiDataset(Dataset):
     def __init__(
         self,
-        base_dataset,
+        json_path: str,
+        root_path: str,
         condition_size: int = 512,
         target_size: int = 512,
         drop_text_prob: float = 0.1,
         return_pil_image: bool = False,
         specific_task: list = None,
     ):
-        self.base_dataset = base_dataset['train']
+        with open(json_path, "r") as f:
+            records = json.load(f)
+
         if specific_task is not None:
-            self.specific_task = specific_task
-            task_indices = [i for i, task in enumerate(self.base_dataset['task']) if task in self.specific_task]
-            task_set = set([task for task in self.base_dataset['task']])
-            ori_len = len(self.base_dataset)
-            self.base_dataset = self.base_dataset.select(task_indices)
-            print(specific_task, len(self.base_dataset), ori_len)
-            print(task_set)
-            
+            records = [r for r in records if r["edit_type"] in specific_task]
+
+        self.base_dataset = records
+        self.root_path = root_path
         self.condition_size = condition_size
         self.target_size = target_size
         self.drop_text_prob = drop_text_prob
         self.return_pil_image = return_pil_image
-        self.to_tensor = T.ToTensor()        
+        self.to_tensor = T.ToTensor()
+
+        from collections import Counter
+        task_counts = Counter(r["edit_type"] for r in self.base_dataset)
+        print(f"\nOminiDataset loaded {len(self.base_dataset)} samples from {json_path}")
+        for task, count in task_counts.items():
+            print(f"  {task}: {count} ({count / len(self.base_dataset) * 100:.1f}%)")
 
     def __len__(self):
         return len(self.base_dataset)
 
     def __getitem__(self, idx):
-        image = self.base_dataset[idx]["src_img"]
-        instruction = 'A diptych with two side-by-side images of the same scene. On the right, the scene is exactly the same as on the left but ' + random.choice(self.base_dataset[idx]["edited_prompt_list"])
-            
-        edited_image = self.base_dataset[idx]["edited_img"]
-        
+        record = self.base_dataset[idx]
+        image = Image.open(os.path.join(self.root_path, record["input_image"]))
+        edited_image = Image.open(os.path.join(self.root_path, record["target_image"]))
+        instruction = (
+            'A diptych with two side-by-side images of the same scene. '
+            'On the right, the scene is exactly the same as on the left but '
+            + record["instruction"]
+        )
+
         image = image.resize((self.condition_size, self.condition_size)).convert("RGB")
         edited_image = edited_image.resize((self.target_size, self.target_size)).convert("RGB")
 
         combined_image = Image.new('RGB', (self.condition_size * 2, self.condition_size))
         combined_image.paste(image, (0, 0))
         combined_image.paste(edited_image, (self.condition_size, 0))
-        
+
         mask = Image.new('L', (self.condition_size * 2, self.condition_size), 0)
         draw = ImageDraw.Draw(mask)
         draw.rectangle([self.condition_size, 0, self.condition_size * 2, self.condition_size], fill=255)
-        
-        mask_combined_image = combined_image.copy()
-        draw = ImageDraw.Draw(mask_combined_image)
-        draw.rectangle([self.condition_size, 0, self.condition_size * 2, self.condition_size], fill=255)
-        
+
         if random.random() < self.drop_text_prob:
             instruction = ""
 
         return {
             "image": self.to_tensor(combined_image),
             "condition": self.to_tensor(mask),
-            "condition_type": "edit", 
+            "condition_type": "edit",
             "description": instruction,
             "position_delta": np.array([0, 0]),
             **({"pil_image": [edited_image, combined_image]} if self.return_pil_image else {}),

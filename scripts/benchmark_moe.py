@@ -25,12 +25,19 @@ parser.add_argument("--output-dir", type=str, default=".", help="Directory to sa
 parser.add_argument("--flux-path", type=str, default='black-forest-labs/flux.1-fill-dev', help="Path to the model")
 parser.add_argument("--lora-path", type=str, default='sanaka87/ICEdit-MoE-LoRA', help="Path to the LoRA weights")
 parser.add_argument("--enable-model-cpu-offload", action="store_true", help="Enable CPU offloading for the model")
-parser.add_argument("--edit_file", type=str, help="edit.json file containing benchmark data")
-parser.add_argument("--data_root", type=str)
+parser.add_argument("--edit-file", type=str, help="edit.json file containing benchmark data")
+parser.add_argument("--data-root", type=str, help="Root path to input data")
+parser.add_argument("--saved-suffix-model", type=str, help="Suffix to model name in saving path")
+parser.add_argument("--top-k", type=int, default=1, help="Override top_k for MoE routing (must be <= num_experts)")
 
 args = parser.parse_args()
 pipe = FluxFillPipeline.from_pretrained(args.flux_path, torch_dtype=torch.bfloat16)
 pipe.load_lora_weights(args.lora_path)
+
+if args.top_k is not None:
+    for module in pipe.transformer.modules():
+        if getattr(module, 'moe_lora', False):
+            module.top_k = args.top_k
 
 if args.enable_model_cpu_offload:
     pipe.enable_model_cpu_offload() 
@@ -53,7 +60,7 @@ for index, edit in enumerate(tqdm(edits)):
     instruction = edit["instruction"]
     # instruction = resize2remove[instruction]
     task = edit["edit_type"] if "edit_type" in edit.keys() else ""
-    save_dir = os.path.join(args.output_dir, task, "ICEdit", str(edit["id"]))
+    save_dir = os.path.join(args.output_dir, task, "ICEdit" + args.saved_suffix_model, str(edit["id"]))
     
     os.makedirs(save_dir, exist_ok=True)
     image = Image.open(image_path)
@@ -103,8 +110,8 @@ for index, edit in enumerate(tqdm(edits)):
     # NOTE: ABLATION STUDY
     ablation_data.extend([(image_path, task, *data) for data in pipe_output.ablation_data])
 
-df = pd.DataFrame(
-    ablation_data,
-    columns=["image_path", "edit_type", "timestep", "layer", "route_weight", "route_path"],
-)
-df.to_csv("/data/repos/models/ICEdit/ablation_AnyEdit_exp.csv")
+# df = pd.DataFrame(
+#     ablation_data,
+#     columns=["image_path", "edit_type", "timestep", "layer", "route_weight", "route_path"],
+# )
+# df.to_csv("/data/repos/models/ICEdit/ablation_AnyEdit_exp_route_rl_ckpt.csv")

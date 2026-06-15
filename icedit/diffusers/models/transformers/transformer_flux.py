@@ -502,19 +502,38 @@ class FluxTransformer2DModel(
 
         for index_block, block in enumerate(self.transformer_blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
+                # Snapshot the routing mode of every MoE layer in this block at
+                # forward time and bake it into the custom_forward closure.  When
+                # use_reentrant=False triggers a backward recompute it calls
+                # custom_forward again with the ORIGINAL captured routing_mode,
+                # so greedy/stochastic mode is replayed correctly even if the
+                # module attribute has changed by the time backward runs.
+                block_routing_mode = next(
+                    (m.routing_mode for m in block.modules() if hasattr(m, "routing_mode")),
+                    None,
+                )
 
-                def create_custom_forward(module, return_dict=None):
+                def create_custom_forward(module, routing_mode=None, return_dict=None):
                     def custom_forward(*inputs):
-                        if return_dict is not None:
-                            return module(*inputs, return_dict=return_dict)
-                        else:
+                        if routing_mode is not None:
+                            saved = {}
+                            for m in module.modules():
+                                if hasattr(m, "routing_mode"):
+                                    saved[m] = m.routing_mode
+                                    m.routing_mode = routing_mode
+                        try:
+                            if return_dict is not None:
+                                return module(*inputs, return_dict=return_dict)
                             return module(*inputs)
-
+                        finally:
+                            if routing_mode is not None:
+                                for m, orig in saved.items():
+                                    m.routing_mode = orig
                     return custom_forward
 
                 ckpt_kwargs: Dict[str, Any] = {"use_reentrant": False} if is_torch_version(">=", "1.11.0") else {}
                 encoder_hidden_states, hidden_states = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
+                    create_custom_forward(block, block_routing_mode),
                     hidden_states,
                     encoder_hidden_states,
                     temb,
@@ -546,19 +565,32 @@ class FluxTransformer2DModel(
 
         for index_block, block in enumerate(self.single_transformer_blocks):
             if torch.is_grad_enabled() and self.gradient_checkpointing:
+                block_routing_mode = next(
+                    (m.routing_mode for m in block.modules() if hasattr(m, "routing_mode")),
+                    None,
+                )
 
-                def create_custom_forward(module, return_dict=None):
+                def create_custom_forward(module, routing_mode=None, return_dict=None):
                     def custom_forward(*inputs):
-                        if return_dict is not None:
-                            return module(*inputs, return_dict=return_dict)
-                        else:
+                        if routing_mode is not None:
+                            saved = {}
+                            for m in module.modules():
+                                if hasattr(m, "routing_mode"):
+                                    saved[m] = m.routing_mode
+                                    m.routing_mode = routing_mode
+                        try:
+                            if return_dict is not None:
+                                return module(*inputs, return_dict=return_dict)
                             return module(*inputs)
-
+                        finally:
+                            if routing_mode is not None:
+                                for m, orig in saved.items():
+                                    m.routing_mode = orig
                     return custom_forward
 
                 ckpt_kwargs: Dict[str, Any] = {"use_reentrant": False} if is_torch_version(">=", "1.11.0") else {}
                 hidden_states = torch.utils.checkpoint.checkpoint(
-                    create_custom_forward(block),
+                    create_custom_forward(block, block_routing_mode),
                     hidden_states,
                     temb,
                     image_rotary_emb,
